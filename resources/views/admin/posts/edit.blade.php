@@ -1,5 +1,3 @@
-{{-- Exemplo de log Laravel (no controller): --}}
-{{-- \Log::info('Usuário acessou a tela de edição de notícia', ['user_id' => auth()->id(), 'post_id' => $post->id]); --}}
 @extends('admin.layout')
 
 @section('title', 'Editar Notícia')
@@ -60,60 +58,34 @@
         </div>
 
         <div class="mb-6">
-            <label class="block text-gray-700 text-sm font-bold mb-2">Galeria Atual (Fotos e Vídeos)</label>
+            <label class="block text-gray-700 text-sm font-bold mb-2">Galeria Atual</label>
             
             @if($post->photos->count() > 0)
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                     @foreach($post->photos as $photo)
                         <div class="relative group">
-                            
-                            {{-- LÓGICA DE EXIBIÇÃO: VÍDEO VS IMAGEM --}}
-                            @if($photo->type == 'video')
-                                <div class="w-full h-32 bg-gray-900 rounded-lg flex items-center justify-center relative overflow-hidden border border-gray-200">
-                                    {{-- Thumbnail do YouTube (via Accessor do Model) --}}
-                                    @if($photo->youtube_thumb)
-                                        <img src="{{ $photo->youtube_thumb }}" class="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:opacity-40 transition-opacity">
-                                    @endif
-
-                                    {{-- Ícone de Play Centralizado --}}
-                                    <div class="z-10 relative">
-                                        <svg class="w-12 h-12 text-white drop-shadow-lg" fill="currentColor" viewBox="0 0 24 24">
-                                            <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/>
-                                        </svg>
-                                    </div>
-
-                                    {{-- Link para abrir o vídeo --}}
-                                    <a href="{{ $photo->video_url }}" target="_blank" class="absolute bottom-0 w-full bg-black/70 text-white text-[10px] px-2 py-1 text-center hover:text-blue-300 truncate">
-                                        Ver no YouTube ↗
-                                    </a>
-                                </div>
-                            @else
-                                <img src="{{ asset('storage/' . $photo->image_path) }}" class="w-full h-32 object-cover rounded-lg shadow-md">
-                            @endif
-
-                            {{-- BOTÃO DE EXCLUIR (Comum para ambos) --}}
-                            <div class="absolute top-2 right-2 z-20">
-                                <form action="{{ route('admin.photos.destroy', $photo->id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Tem certeza que deseja excluir este item?')">
+                            <img src="{{ asset('storage/' . $photo->image_path) }}" class="w-full h-32 object-cover rounded-lg shadow-md">
+                            <div class="absolute top-2 right-2">
+                                <form action="{{ route('admin.photos.destroy', $photo->id) }}" method="POST" onsubmit="return confirm('Tem certeza que deseja excluir esta foto?')">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="bg-red-600/90 hover:bg-red-700 text-white rounded-full p-2 shadow-lg transition-all hover:scale-110 backdrop-blur-sm">
+                                    <button type="submit" class="bg-red-600 hover:bg-red-700 text-white rounded-full p-2 shadow-lg">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                                         </svg>
                                     </button>
                                 </form>
                             </div>
-
                         </div>
                     @endforeach
                 </div>
             @else
-                <div class="p-4 bg-gray-50 rounded-lg text-center border border-dashed border-gray-300">
-                    <p class="text-gray-500">Nenhuma foto ou vídeo na galeria ainda.</p>
-                </div>
+                <p class="text-gray-500 text-sm">Nenhuma foto na galeria ainda.</p>
             @endif
-            
-            <label for="photos" class="block text-gray-700 text-sm font-bold mb-2">Adicionar Novas Fotos</label>
+        </div>
+
+        <div class="mb-6">
+            <label for="photos" class="block text-gray-700 text-sm font-bold mb-2">Adicionar Novas Fotos à Galeria</label>
             <input type="file" name="photos[]" id="photos" accept="image/*" multiple
                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#1e3a5f] @error('photos.*') border-red-500 @enderror">
             <p class="text-gray-500 text-xs mt-1">
@@ -128,42 +100,18 @@
         </div>
 
         <div class="mb-6">
-        <label class="block text-gray-700 text-sm font-bold mb-2">Vídeos do YouTube</label>
-        <div id="video_inputs_container">
-            @php $videoCount = 0; @endphp
-            @foreach($post->photos->where('type', 'video') as $video)
-                <div class="flex gap-2 mb-2 video-input-group">
-                    <input type="url" name="video_urls[]" value="{{ $video->video_url }}" placeholder="Cole o link do YouTube aqui (ex: https://youtube.com/watch?v=...)" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#1e3a5f]">
-                    <button type="button" onclick="removeVideoInput(this)" class="bg-red-100 text-red-600 px-3 rounded-lg hover:bg-red-200">✕</button>
-                </div>
-                @php $videoCount++; @endphp
-            @endforeach
-            @if($videoCount == 0)
-                <div class="flex gap-2 mb-2 video-input-group">
-                    <input type="url" name="video_urls[]" placeholder="Cole o link do YouTube aqui (ex: https://youtube.com/watch?v=...)" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#1e3a5f]">
-                    <button type="button" onclick="removeVideoInput(this)" class="bg-red-100 text-red-600 px-3 rounded-lg hover:bg-red-200">✕</button>
-                </div>
-            @endif
-        </div>
-        <button type="button" onclick="addVideoInput()" class="mt-2 text-sm text-[#1e3a5f] font-bold hover:underline flex items-center">
-            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-            Adicionar outro vídeo
-        </button>
-        </div>
-
-        <div class="mb-6">
             <label class="flex items-center">
                 <input type="checkbox" name="published" value="1" {{ old('published', $post->published) ? 'checked' : '' }}
                     class="form-checkbox h-5 w-5 text-[#1e3a5f]">
-                <span class="ml-2 text-gray-700">Publicar</span>
+                <span class="ml-2 text-gray-700">Publicar esta notícia</span>
             </label>
         </div>
 
         <div class="flex gap-4">
-            <button type="submit" id="btn-atualizar-noticia" class="bg-[#1e3a5f] hover:bg-[#2d5a8f] text-white font-bold py-3 px-6 rounded-lg">
+            <button type="submit" class="bg-[#1e3a5f] hover:bg-[#2d5a8f] text-white font-bold py-3 px-6 rounded-lg transition-all">
                 Atualizar Notícia
             </button>
-            <a href="{{ route('admin.posts.index') }}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg">
+            <a href="{{ route('admin.posts.index') }}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg inline-block text-center">
                 Cancelar
             </a>
         </div>
@@ -172,74 +120,68 @@
 
 @push('scripts')
 <script>
-    // Log ao clicar no botão Atualizar Notícia
-    document.getElementById('btn-atualizar-noticia').addEventListener('click', function(e) {
-           {{-- Exemplo de log Laravel (no controller, não na view): --}}
-           {{-- \Log::info('Usuário acessou a tela de edição de notícia', ['user_id' => auth()->id(), 'post_id' => $post->id]); --}}
-    });
+    console.log('Script de edição carregado!');
+    
     // Preview cover image
-    document.getElementById('cover_image').addEventListener('change', function(e) {
-        const preview = document.getElementById('cover_preview');
-        preview.innerHTML = '';
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                preview.innerHTML = `<img src="${e.target.result}" class="max-w-md rounded-lg shadow-md">`;
+    const coverInput = document.getElementById('cover_image');
+    if (coverInput) {
+        coverInput.addEventListener('change', function(e) {
+            const preview = document.getElementById('cover_preview');
+            preview.innerHTML = '';
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.innerHTML = `<img src="${e.target.result}" class="max-w-md rounded-lg shadow-md">`;
+                }
+                reader.readAsDataURL(file);
             }
-            reader.readAsDataURL(file);
-        }
-    });
+        });
+    }
 
     // Preview gallery images
-    document.getElementById('photos').addEventListener('change', function(e) {
-        const preview = document.getElementById('gallery_preview');
-        const countDiv = document.getElementById('selected_count');
-        preview.innerHTML = '';
-        const files = Array.from(e.target.files);
-        
-        if (files.length > 0) {
-            countDiv.innerHTML = `✅ ${files.length} nova(s) foto(s) selecionada(s) para adicionar`;
-        } else {
-            countDiv.innerHTML = '';
-        }
-        
-        files.forEach((file, index) => {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const div = document.createElement('div');
-                div.className = 'relative';
-                div.innerHTML = `
-                    <img src="${e.target.result}" class="w-full h-32 object-cover rounded-lg shadow-md">
-                    <div class="absolute top-2 left-2 bg-green-600 text-white text-xs px-2 py-1 rounded">NOVA #${index + 1}</div>
-                `;
-                preview.appendChild(div);
+    const photosInput = document.getElementById('photos');
+    if (photosInput) {
+        photosInput.addEventListener('change', function(e) {
+            const preview = document.getElementById('gallery_preview');
+            const countDiv = document.getElementById('selected_count');
+            preview.innerHTML = '';
+            const files = Array.from(e.target.files);
+            
+            if (files.length > 0) {
+                countDiv.innerHTML = `✅ ${files.length} nova(s) foto(s) selecionada(s) para adicionar`;
+            } else {
+                countDiv.innerHTML = '';
             }
-            reader.readAsDataURL(file);
+            
+            files.forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const div = document.createElement('div');
+                    div.className = 'relative';
+                    div.innerHTML = `
+                        <img src="${e.target.result}" class="w-full h-32 object-cover rounded-lg shadow-md">
+                        <div class="absolute top-2 left-2 bg-green-600 text-white text-xs px-2 py-1 rounded">NOVA #${index + 1}</div>
+                    `;
+                    preview.appendChild(div);
+                }
+                reader.readAsDataURL(file);
+            });
         });
-    });
-    function addVideoInput() {
-    const container = document.getElementById('video_inputs_container');
-    const div = document.createElement('div');
-    div.className = 'flex gap-2 mb-2 video-input-group';
-    div.innerHTML = `
-        <input type="url" name="video_urls[]" placeholder="Cole o link do YouTube aqui" 
-            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#1e3a5f]">
-        <button type="button" onclick="removeVideoInput(this)" class="bg-red-100 text-red-600 px-3 rounded-lg hover:bg-red-200">✕</button>
-    `;
-    container.appendChild(div);
-}
-
-function removeVideoInput(button) {
-    const container = document.getElementById('video_inputs_container');
-    // Não deixa remover se for o único input
-    if (container.getElementsByClassName('video-input-group').length > 1) {
-        button.parentElement.remove();
-    } else {
-        // Se for o último, apenas limpa o valor
-        button.previousElementSibling.value = '';
     }
-}
+    
+    // Feedback visual ao submeter
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = '⏳ Atualizando...';
+                submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+        });
+    }
 </script>
 @endpush
 @endsection
