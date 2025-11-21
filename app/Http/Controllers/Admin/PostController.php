@@ -39,10 +39,12 @@ class PostController extends Controller
             'cover_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:10240',
             'photos' => 'nullable|array',
             'photos.*' => 'image|mimes:jpeg,png,jpg,gif,webp|max:10240',
+            'video_urls' => 'nullable|array',
+            'video_urls.*' => 'nullable|url',
             'published' => 'nullable|boolean'
         ]);
 
-        $validated['published'] = $request->has('published') ? true : false;
+        $validated['published'] = $request->has('published');
 
         // Upload cover image
         if ($request->hasFile('cover_image')) {
@@ -53,7 +55,7 @@ class PostController extends Controller
 
         $post = Post::create($validated);
 
-        // Upload gallery photos
+        // Salvar Fotos da Galeria
         if ($request->hasFile('photos')) {
             $photos = $request->file('photos');
             foreach ($photos as $index => $photo) {
@@ -63,14 +65,29 @@ class PostController extends Controller
                         'post_id' => $post->id,
                         'image_path' => $path,
                         'order' => $index,
-                        'caption' => null
                     ]);
                 }
             }
         }
 
-        $photoCount = $request->hasFile('photos') ? count($request->file('photos')) : 0;
-        return redirect()->route('admin.posts.index')->with('success', "Notícia criada com sucesso! {$photoCount} foto(s) adicionada(s).");
+        // Salvar Vídeos do YouTube
+        if ($request->has('video_urls')) {
+            $currentCount = $post->photos()->count();
+            foreach ($request->video_urls as $url) {
+                if (!empty($url)) {
+                    Photo::create([
+                        'post_id' => $post->id,
+                        'type' => 'video',
+                        'video_url' => $url,
+                        'image_path' => null,
+                        'order' => $currentCount,
+                    ]);
+                    $currentCount++;
+                }
+            }
+        }
+
+        return redirect()->route('admin.posts.index')->with('success', "Notícia criada com sucesso!");
     }
 
     /**
@@ -96,6 +113,7 @@ class PostController extends Controller
      */
     public function update(Request $request, Post $post)
     {
+        // 1. Validação
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'required|string',
@@ -103,29 +121,35 @@ class PostController extends Controller
             'cover_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:10240',
             'photos' => 'nullable|array',
             'photos.*' => 'image|mimes:jpeg,png,jpg,gif,webp|max:10240',
+            'video_urls' => 'nullable|array',
+            'video_urls.*' => 'nullable|url',
             'published' => 'nullable|boolean'
         ]);
 
-        $validated['published'] = $request->has('published') ? true : false;
+        $validated['published'] = $request->has('published');
 
-        // Upload new cover image
+        // 2. Atualizar imagem de capa
         if ($request->hasFile('cover_image')) {
-            // Delete old cover
-            if ($post->cover_image) {
+            // Deleta a antiga se existir
+            if ($post->cover_image && Storage::disk('public')->exists($post->cover_image)) {
                 Storage::disk('public')->delete($post->cover_image);
             }
             $coverFile = $request->file('cover_image');
             $coverPath = $coverFile->store('posts/covers', 'public');
             $validated['cover_image'] = $coverPath;
+        } else {
+            // Remove do array validado para não sobrescrever com null se não for enviada
+            unset($validated['cover_image']);
         }
 
+        // 3. Atualiza os dados do Post
         $post->update($validated);
 
-        // Upload new gallery photos
-        $photoCount = 0;
+        // 4. Adicionar novas fotos à galeria (Append)
         if ($request->hasFile('photos')) {
-            $currentCount = $post->photos()->count();
             $photos = $request->file('photos');
+            // Pega a contagem atual para continuar a ordem
+            $currentCount = $post->photos()->max('order') ?? 0; 
             
             foreach ($photos as $index => $photo) {
                 if ($photo->isValid()) {
@@ -133,19 +157,36 @@ class PostController extends Controller
                     Photo::create([
                         'post_id' => $post->id,
                         'image_path' => $path,
-                        'order' => $currentCount + $index,
-                        'caption' => null
+                        'order' => $currentCount + $index + 1,
                     ]);
-                    $photoCount++;
                 }
             }
         }
 
-        $message = $photoCount > 0 
-            ? "Notícia atualizada com sucesso! {$photoCount} foto(s) adicionada(s)."
-            : 'Notícia atualizada com sucesso!';
-            
-        return redirect()->route('admin.posts.index')->with('success', $message);
+        // 5. Atualizar vídeos (Remove antigos e adiciona novos, ou apenas adiciona se for essa a lógica desejada)
+        // A lógica abaixo remove APENAS se novos vídeos forem enviados, para evitar duplicação
+        if ($request->has('video_urls')) {
+            // Remove vídeos antigos (opcional: depende se você quer substituir ou adicionar)
+            // Assumindo substituição baseada no código original:
+            $post->photos()->where('type', 'video')->delete();
+
+            $currentCount = $post->photos()->max('order') ?? 0;
+
+            foreach ($request->video_urls as $url) {
+                if (!empty($url)) {
+                    $currentCount++;
+                    Photo::create([
+                        'post_id' => $post->id,
+                        'type' => 'video',
+                        'video_url' => $url,
+                        'image_path' => null,
+                        'order' => $currentCount,
+                    ]);
+                }
+            }
+        }
+
+        return redirect()->route('admin.posts.index')->with('success', "Notícia atualizada com sucesso!");
     }
 
     /**
@@ -154,37 +195,39 @@ class PostController extends Controller
     public function destroy(Post $post)
     {
         // Delete cover image
-        if ($post->cover_image) {
+        if ($post->cover_image && Storage::disk('public')->exists($post->cover_image)) {
             Storage::disk('public')->delete($post->cover_image);
         }
 
-        // Delete gallery photos
+        // Delete gallery photos (arquivos físicos)
+        // Carrega as fotos antes de deletar o post para ter acesso aos caminhos
         foreach ($post->photos as $photo) {
-            Storage::disk('public')->delete($photo->image_path);
-        }
-
-        $post->delete();
-
-        return redirect()->route('admin.posts.index')->with('success', 'Notícia deletada com sucesso!');
-    }
-
-    /**
-     * Delete a single photo from gallery
-     */
-    public function deletePhoto(Photo $photo)
-    {
-        try {
-            // Delete the physical file
             if ($photo->image_path && Storage::disk('public')->exists($photo->image_path)) {
                 Storage::disk('public')->delete($photo->image_path);
             }
+        }
+
+        $post->delete(); // O delete cascade do banco deve apagar os registros das fotos/videos
+
+        return redirect()->route('admin.posts.index')->with('success', 'Notícia deletada com sucesso!');
+    }
+    
+    public function deletePhoto($id)
+    {
+        try {
+            $photo = Photo::findOrFail($id);
+
+            // Se for imagem, deleta o arquivo físico
+            if ($photo->type === 'image' && $photo->image_path && Storage::disk('public')->exists($photo->image_path)) {
+                Storage::disk('public')->delete($photo->image_path);
+            }
             
-            // Delete the database record
+            // Deleta o registro do banco (funciona para imagem e video)
             $photo->delete();
 
-            return back()->with('success', 'Foto deletada com sucesso!');
+            return back()->with('success', 'Mídia removida com sucesso!');
         } catch (\Exception $e) {
-            return back()->with('error', 'Erro ao deletar foto: ' . $e->getMessage());
+            return back()->with('error', 'Erro ao deletar mídia: ' . $e->getMessage());
         }
     }
 

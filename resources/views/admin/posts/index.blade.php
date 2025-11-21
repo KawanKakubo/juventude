@@ -39,7 +39,16 @@
                     <p class="text-gray-600 text-sm mb-4 line-clamp-2">{{ Str::limit($post->description, 100) }}</p>
                     
                     <div class="flex items-center justify-between text-sm">
-                        <span class="text-gray-500">{{ $post->photos->count() }} fotos</span>
+                        @php
+                            $videoCount = $post->photos->where('type', 'video')->count();
+                            $photoCount = $post->photos->where('type', '!=', 'video')->count();
+                        @endphp
+                        <span class="text-gray-500">
+                            {{ $photoCount }} foto{{ $photoCount == 1 ? '' : 's' }}
+                            @if($videoCount > 0)
+                                &bull; {{ $videoCount }} vídeo{{ $videoCount == 1 ? '' : 's' }}
+                            @endif
+                        </span>
                         <div class="flex gap-2">
                             <a href="{{ route('admin.posts.edit', $post) }}" class="text-blue-600 hover:text-blue-800">Editar</a>
                             <form action="{{ route('admin.posts.destroy', $post) }}" method="POST" class="inline" onsubmit="return confirm('Tem certeza?')">
